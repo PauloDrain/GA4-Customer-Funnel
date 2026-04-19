@@ -1,0 +1,1236 @@
+SELECT
+  *
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('purchase') 
+LIMIT 10
+;
+
+SELECT
+  event_name,
+  event_params.key
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('add_shipping_info', 'add_payment_info', 'purchase') 
+LIMIT 10
+
+;
+WITH
+Customer_Funnel AS (
+SELECT
+  event_name as events,
+  COUNT(DISTINCT user_pseudo_id) AS Customers,
+CASE
+  WHEN event_name = 'session_start' THEN 1
+  WHEN event_name = 'select_item' THEN 2
+  WHEN event_name = 'add_to_cart' THEN 3
+  WHEN event_name ='begin_checkout' THEN 4
+  WHEN event_name ='add_shipping_info' THEN 5
+  WHEN event_name ='add_payment_info' THEN 6
+  WHEN event_name ='purchase' THEN 7
+END AS Order_Funnel
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+GROUP BY event_name
+HAVING event_name IN ('session_start', 'select_item','add_to_cart','begin_checkout', 'add_shipping_info','add_payment_info', 'purchase' )
+),
+
+Order_Funneler AS 
+(
+SELECT
+  Events, 
+  LEAD(SUM(Customers), 1 , 0) OVER(ORDER BY SUM(Order_Funnel)) As Leading_Customers
+FROM Customer_Funnel
+Group BY Events
+ORDER BY Events
+)
+
+SELECT
+  CF.events,
+  cf.Customers,
+  orf.leading_customers,
+  LAG(ROUND(((orf.leading_customers * 100) / cf.customers),2),1,0) OVER(ORDER BY Order_Funnel)AS Percentage_Dropoff
+FROM Order_Funneler OrF
+JOIN Customer_Funnel CF
+  ON CF.events = OrF.events
+ORDER BY cf.order_funnel
+
+;
+
+SELECT
+  DISTINCT event_name
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+
+;
+
+WITH
+Customer_Funnel AS (
+SELECT
+  event_name as events,
+  COUNT(DISTINCT user_pseudo_id) AS Customers,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='view_promotion' THEN 4
+  WHEN event_name ='select_promotion' THEN 5
+  WHEN event_name ='select_item' THEN 6
+END AS Order_Funnel
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+GROUP BY event_name
+HAVING event_name IN ('session_start', 'first_visit','page_view','view_promotion','select_promotion','select_item' )
+),
+
+Order_Funneler AS 
+(
+SELECT
+  Events, 
+  LEAD(SUM(Customers), 1 , 0) OVER(ORDER BY SUM(Order_Funnel)) As Leading_Customers
+FROM Customer_Funnel
+Group BY Events
+ORDER BY Events
+)
+
+SELECT
+  CF.events,
+  cf.Customers,
+  orf.leading_customers,
+  LAG(ROUND(((orf.leading_customers * 100) / cf.customers),2),1,0) OVER(ORDER BY Order_Funnel)AS Percentage_Dropoff
+FROM Order_Funneler OrF
+JOIN Customer_Funnel CF
+  ON CF.events = OrF.events
+ORDER BY cf.order_funnel
+
+;
+
+WITH
+Customer_Funnel AS (
+SELECT
+  event_name as events,
+  COUNT(DISTINCT user_pseudo_id) AS Customers,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name = 'user_engagment' THEN 4
+  WHEN event_name ='select_item' THEN 5
+END AS Order_Funnel
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+GROUP BY event_name
+HAVING event_name IN ('session_start', 'first_visit','page_view','user_engagment','select_item' )
+),
+
+Order_Funneler AS 
+(
+SELECT
+  Events, 
+  LEAD(SUM(Customers), 1 , 0) OVER(ORDER BY SUM(Order_Funnel)) As Leading_Customers
+FROM Customer_Funnel
+Group BY Events
+ORDER BY Events
+)
+
+SELECT
+  CF.events,
+  cf.Customers,
+  orf.leading_customers,
+  LAG(ROUND(((orf.leading_customers * 100) / cf.customers),2),1,0) OVER(ORDER BY Order_Funnel)AS Percentage_Dropoff
+FROM Order_Funneler OrF
+JOIN Customer_Funnel CF
+  ON CF.events = OrF.events
+ORDER BY cf.order_funnel
+
+;
+
+WITH Event_Cust AS (
+SELECT
+  DISTINCT event_name,
+  COUNT(DISTINCT user_pseudo_id) AS Customers,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` Bg4
+GROUP BY event_name
+HAVING event_name IN ('session_start', 'first_visit','page_view','user_engagement','select_item' )
+),
+
+User_Eng AS (
+SELECT
+  DISTINCT event_name,
+  (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='engagement_time_msec') AS params
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+WHERE event_name = 'user_engagement'
+)
+
+SELECT
+  *
+FROM User_Eng UE
+JOIN Event_Cust EC
+ON ec.event_name = ue.event_name
+
+;
+
+SELECT
+  *
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` 
+LIMIT 10
+;
+
+
+-- Device Categories --
+
+WITH Unique_Devices AS (
+SELECT
+    DISTINCT device.category As Devices,
+    COUNT (DISTINCT user_pseudo_id) AS Users
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY device.category
+)
+
+SELECT  
+  Devices,
+  Users,
+  (Users * 100 / (SELECT COUNT (DISTINCT user_pseudo_id) FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` ))
+FROM Unique_Devices
+GROUP BY Devices, Users
+;
+WITH Total_Devices AS (
+  SELECT
+    DISTINCT device.category As Devices,
+    COUNT (device.category) AS Total_Cats
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY device.category
+)
+
+SELECT  
+  Devices,
+  Total_Cats,
+  (Total_cats * 100 / (SELECT COUNT(device.category) FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` ))
+FROM Total_Devices
+GROUP BY Devices, Total_cats
+;
+
+-- Devices Via Order Funnel --
+
+WITH Device_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='view_promotion' THEN 4
+  WHEN event_name ='select_promotion' THEN 5
+  WHEN event_name ='select_item' THEN 6
+END AS Order_Funnel,
+COUNT(DISTINCT CASE
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','view_promotion','select_promotion','select_item' ) 
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Mobile,
+  LEAD(Mobile) OVER(ORDER BY Order_Funnel),
+  (LEAD(Mobile) OVER(ORDER BY Order_Funnel) * 100 / Mobile) As Mobile_Perc,
+  Desktop,
+  LEAD(Desktop) OVER(ORDER BY Order_Funnel),
+  (LEAD(Desktop) OVER(ORDER BY Order_Funnel) * 100 / Desktop) AS Desktop_Perc,
+  Tablet,
+  LEAD(Tablet) OVER(ORDER BY Order_Funnel),
+  (LEAD(Tablet) OVER(ORDER BY Order_Funnel) * 100 / Tablet)
+FROM Device_Filtered
+Order By Order_funnel
+
+;
+
+WITH Device_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='select_item' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','select_item' ) 
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Mobile,
+  LEAD(Mobile) OVER(ORDER BY Order_Funnel),
+  (LEAD(Mobile) OVER(ORDER BY Order_Funnel) * 100 / Mobile) As Mobile_Perc,
+  Desktop,
+  LEAD(Desktop) OVER(ORDER BY Order_Funnel),
+  (LEAD(Desktop) OVER(ORDER BY Order_Funnel) * 100 / Desktop) AS Desktop_Perc,
+  Tablet,
+  LEAD(Tablet) OVER(ORDER BY Order_Funnel),
+  (LEAD(Tablet) OVER(ORDER BY Order_Funnel) * 100 / Tablet)
+FROM Device_Filtered
+Order By Order_funnel
+
+
+
+
+;
+
+WITH Device_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='select_item' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','select_item' ) 
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+)
+SELECT
+  Events,
+  Order_Funnel,
+  SUM(Desktop) As Desktop,
+  SUM(Mobile) AS Mobile,
+  ROUND((SUM(Desktop) * 100 / (SUM(Desktop) + SUM(Mobile) + SUM(Tablet))), 2) AS Desktop_Perc_Total,
+  ROUND((SUM(Mobile) * 100 / (SUM(Desktop) + SUM(Mobile) + SUM(Tablet))), 2) AS Mobile_Perc_Total,
+  (SUM(Desktop) + SUM(Mobile) + SUM(Tablet)) AS Total_Devices
+FROM Device_Filtered DF
+GROUP BY Events, Order_Funnel
+Order by Order_Funnel
+;
+
+
+-- Location of Customers
+
+SELECT
+  DISTINCT geo.continent
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+
+;
+SELECT
+  DISTINCT geo.sub_continent
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+;
+
+SELECT  
+  DISTINCT geo.country,
+  COUNT(geo.country)
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY 1
+Order by 2 DESC
+
+
+;
+WITH Countries_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='view_promotion' THEN 4
+  WHEN event_name ='select_promotion' THEN 5
+  WHEN event_name ='select_item' THEN 6
+END AS Order_Funnel,
+COUNT(CASE
+  WHEN geo.country = "United States" THEN user_pseudo_id
+END) AS USA,
+COUNT(CASE
+  WHEN geo.country = "India" THEN user_pseudo_id
+END) AS India,
+COUNT(CASE
+  WHEN geo.country = "Canada" THEN user_pseudo_id
+END) AS Canada,
+COUNT(CASE
+  WHEN geo.country = "United Kingdom" THEN user_pseudo_id
+END) AS UK,
+COUNT(CASE
+  WHEN geo.country = "France" THEN user_pseudo_id
+END) AS France,
+COUNT(CASE
+  WHEN geo.country = "Spain" THEN user_pseudo_id
+END) AS Spain,
+COUNT(CASE
+  WHEN geo.country = "China" THEN user_pseudo_id
+END) AS China,
+COUNT(CASE
+  WHEN geo.country = "Taiwan" THEN user_pseudo_id
+END) AS Taiwan,
+COUNT(CASE
+  WHEN geo.country = "Germany" THEN user_pseudo_id
+END) AS Germany,
+COUNT(CASE
+  WHEN geo.country = "Italy" THEN user_pseudo_id
+END) AS Italy,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','view_promotion','select_promotion','select_item' ) 
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+),
+
+Countries_Percantage AS (
+SELECT
+  Events,
+  Order_funnel,
+  USA,
+  LEAD(USA) OVER(ORDER BY Order_Funnel),
+  (LEAD(USA) OVER(ORDER BY Order_Funnel) * 100 / USA) As USA_Perc,
+  India,
+  LEAD(India) OVER(ORDER BY Order_Funnel),
+  (LEAD(India) OVER(ORDER BY Order_Funnel) * 100 / India) As India_Perc,
+  Canada,
+  LEAD(Canada) OVER(ORDER BY Order_Funnel),
+  (LEAD(Canada) OVER(ORDER BY Order_Funnel) * 100 / Canada) As Canada_Perc,
+  UK,
+  LEAD(UK) OVER(ORDER BY Order_Funnel),
+  (LEAD(UK) OVER(ORDER BY Order_Funnel) * 100 / UK) As UK_Perc,
+  France,
+  LEAD(France) OVER(ORDER BY Order_Funnel),
+  (LEAD(France) OVER(ORDER BY Order_Funnel) * 100 / France) As France_Perc,
+  Spain,
+  LEAD(Spain) OVER(ORDER BY Order_Funnel),
+  (LEAD(Spain) OVER(ORDER BY Order_Funnel) * 100 / Spain) As Spain_Perc,
+  China,
+  LEAD(China) OVER(ORDER BY Order_Funnel),
+  (LEAD(China) OVER(ORDER BY Order_Funnel) * 100 / China) As China_Perc,
+  Taiwan,
+  LEAD(Taiwan) OVER(ORDER BY Order_Funnel),
+  (LEAD(Taiwan) OVER(ORDER BY Order_Funnel) * 100 / Taiwan) As Taiwan_Perc,
+  Germany,
+  LEAD(Germany) OVER(ORDER BY Order_Funnel),
+  (LEAD(Germany) OVER(ORDER BY Order_Funnel) * 100 / Germany) As Germany_Perc,
+  Italy,
+  LEAD(Italy) OVER(ORDER BY Order_Funnel),
+  (LEAD(Italy) OVER(ORDER BY Order_Funnel) * 100 / Italy) As Italy_Perc
+FROM Countries_Filtered
+Order By Order_funnel
+)
+
+SELECT
+  Events,
+  LAG (USA_Perc) OVER(ORDER BY Order_Funnel) AS USA,
+  LAG (India_Perc) OVER(ORDER BY Order_Funnel) AS India,
+  LAG (Canada_Perc) OVER(ORDER BY Order_Funnel) AS Canada,
+  LAG (UK_Perc) OVER(ORDER BY Order_Funnel) AS UK,
+  LAG (France_Perc) OVER(ORDER BY Order_Funnel) AS France,
+  LAG (Spain_Perc) OVER(ORDER BY Order_Funnel) AS Spain,
+  LAG (China_Perc) OVER(ORDER BY Order_Funnel) AS China,
+  LAG (Taiwan_Perc) OVER(ORDER BY Order_Funnel) AS Taiwan,
+  LAG (Germany_Perc) OVER(ORDER BY Order_Funnel) AS Germany,
+  LAG (Italy_Perc) OVER(ORDER BY Order_Funnel) AS Italy
+FROM  Countries_Percantage
+Order By Order_Funnel
+;
+
+WITH Countries_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name ='select_item' THEN 4
+END AS Order_Funnel,
+COUNT(CASE
+  WHEN geo.country = "United States" THEN user_pseudo_id
+END) AS USA,
+COUNT(CASE
+  WHEN geo.country = "India" THEN user_pseudo_id
+END) AS India,
+COUNT(CASE
+  WHEN geo.country = "Canada" THEN user_pseudo_id
+END) AS Canada,
+COUNT(CASE
+  WHEN geo.country = "United Kingdom" THEN user_pseudo_id
+END) AS UK,
+COUNT(CASE
+  WHEN geo.country = "France" THEN user_pseudo_id
+END) AS France,
+COUNT(CASE
+  WHEN geo.country = "Spain" THEN user_pseudo_id
+END) AS Spain,
+COUNT(CASE
+  WHEN geo.country = "China" THEN user_pseudo_id
+END) AS China,
+COUNT(CASE
+  WHEN geo.country = "Taiwan" THEN user_pseudo_id
+END) AS Taiwan,
+COUNT(CASE
+  WHEN geo.country = "Germany" THEN user_pseudo_id
+END) AS Germany,
+COUNT(CASE
+  WHEN geo.country = "Italy" THEN user_pseudo_id
+END) AS Italy,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','select_item' ) 
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+),
+
+Countries_Percantage AS (
+SELECT
+  Events,
+  Order_funnel,
+  USA,
+  LEAD(USA) OVER(ORDER BY Order_Funnel),
+  (LEAD(USA) OVER(ORDER BY Order_Funnel) * 100 / USA) As USA_Perc,
+  India,
+  LEAD(India) OVER(ORDER BY Order_Funnel),
+  (LEAD(India) OVER(ORDER BY Order_Funnel) * 100 / India) As India_Perc,
+  Canada,
+  LEAD(Canada) OVER(ORDER BY Order_Funnel),
+  (LEAD(Canada) OVER(ORDER BY Order_Funnel) * 100 / Canada) As Canada_Perc,
+  UK,
+  LEAD(UK) OVER(ORDER BY Order_Funnel),
+  (LEAD(UK) OVER(ORDER BY Order_Funnel) * 100 / UK) As UK_Perc,
+  France,
+  LEAD(France) OVER(ORDER BY Order_Funnel),
+  (LEAD(France) OVER(ORDER BY Order_Funnel) * 100 / France) As France_Perc,
+  Spain,
+  LEAD(Spain) OVER(ORDER BY Order_Funnel),
+  (LEAD(Spain) OVER(ORDER BY Order_Funnel) * 100 / Spain) As Spain_Perc,
+  China,
+  LEAD(China) OVER(ORDER BY Order_Funnel),
+  (LEAD(China) OVER(ORDER BY Order_Funnel) * 100 / China) As China_Perc,
+  Taiwan,
+  LEAD(Taiwan) OVER(ORDER BY Order_Funnel),
+  (LEAD(Taiwan) OVER(ORDER BY Order_Funnel) * 100 / Taiwan) As Taiwan_Perc,
+  Germany,
+  LEAD(Germany) OVER(ORDER BY Order_Funnel),
+  (LEAD(Germany) OVER(ORDER BY Order_Funnel) * 100 / Germany) As Germany_Perc,
+  Italy,
+  LEAD(Italy) OVER(ORDER BY Order_Funnel),
+  (LEAD(Italy) OVER(ORDER BY Order_Funnel) * 100 / Italy) As Italy_Perc
+FROM Countries_Filtered
+Order By Order_funnel
+)
+
+SELECT
+  Events,
+  LAG (USA_Perc) OVER(ORDER BY Order_Funnel) AS USA,
+  LAG (India_Perc) OVER(ORDER BY Order_Funnel) AS India,
+  LAG (Canada_Perc) OVER(ORDER BY Order_Funnel) AS Canada,
+  LAG (UK_Perc) OVER(ORDER BY Order_Funnel) AS UK,
+  LAG (France_Perc) OVER(ORDER BY Order_Funnel) AS France,
+  LAG (Spain_Perc) OVER(ORDER BY Order_Funnel) AS Spain,
+  LAG (China_Perc) OVER(ORDER BY Order_Funnel) AS China,
+  LAG (Taiwan_Perc) OVER(ORDER BY Order_Funnel) AS Taiwan,
+  LAG (Germany_Perc) OVER(ORDER BY Order_Funnel) AS Germany,
+  LAG (Italy_Perc) OVER(ORDER BY Order_Funnel) AS Italy
+FROM  Countries_Percantage
+Order By Order_Funnel
+;
+
+-- User Retention -- 
+WITH Devices_Time AS (
+SELECT 
+  event_name AS Events,
+CASE
+  WHEN event_name = 'first_visit' THEN 1
+  WHEN event_name = 'session_start' THEN 2
+  WHEN event_name = 'page_view' THEN 3
+  WHEN event_name = 'view_promotion' THEN 4
+  WHEN event_name = 'select_promotion' THEN 5
+  WHEN event_name ='select_item' THEN 6
+END AS Order_Funnel,
+COUNT(DISTINCT CASE
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'first_visit','page_view','view_promotion','select_promotion','select_item' ) 
+GROUP BY event_name
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Mobile,
+  LEAD(Mobile) OVER(ORDER BY Order_Funnel),
+  Desktop,
+  LEAD(Desktop) OVER(ORDER BY Order_Funnel),
+  Tablet,
+  LEAD(Tablet) OVER(ORDER BY Order_Funnel),
+  Site_Viewed
+FROM Devices_Time
+Order By Order_funnel
+;
+-- Payment Funnel Gap --
+-- Devices Used --
+WITH Device_Used AS (
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+GROUP BY event_name
+ORDER BY Order_Funnel
+),
+
+Devices_Percentage AS (
+SELECT 
+  Order_Funnel,
+  Events,
+  Mobile,
+  LEAD(Mobile) OVER(ORDER BY Order_Funnel),
+  (LEAD(Mobile) OVER(ORDER BY Order_Funnel) * 100 / Mobile) As Mobile_Perc,
+  Desktop,
+  LEAD(Desktop) OVER(ORDER BY Order_Funnel),
+  (LEAD(Desktop) OVER(ORDER BY Order_Funnel) * 100 / Desktop) AS Desktop_Perc,
+  Tablet,
+  LEAD(Tablet) OVER(ORDER BY Order_Funnel),
+  (LEAD(Tablet) OVER(ORDER BY Order_Funnel) * 100 / Tablet) AS Tablet_Perc
+FROM Device_Used
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Mobile AS Mobile_Total,
+  LAG(Mobile_Perc) OVER(ORDER BY Order_Funnel) AS Mobile_Funnel,
+  Desktop AS Desktop_Total,
+  LAG(Desktop_Perc) OVER(ORDER BY Order_Funnel) AS Desktop_Funnel
+FROM Devices_Percentage
+ORDER BY Order_Funnel
+;
+-- Web Browser --
+
+SELECT
+  DISTINCT device.web_info.browser,
+  COUNT (device.web_info.browser)
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+GROUP BY 1
+
+;
+WITH Browser_Used AS (
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Chrome" THEN user_pseudo_id
+END) AS Chrome,
+COUNT(DISTINCT CASE
+  WHEN device.web_info.browser = "Safari" THEN user_pseudo_id
+END) AS Safari,
+COUNT(DISTINCT CASE
+  WHEN device.web_info.browser = "Edge" THEN user_pseudo_id
+END) AS Edge,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Firefox" THEN user_pseudo_id
+END) AS Firefox,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "<Other>" THEN user_pseudo_id
+END) AS Other_Browsers,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Android Webview" THEN user_pseudo_id
+END) AS Android_Webview,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+GROUP BY event_name
+ORDER BY Order_Funnel
+),
+
+Browser_Percentage AS (
+SELECT 
+  Order_Funnel,
+  Events,
+  Chrome,
+  LEAD(Chrome) OVER(ORDER BY Order_Funnel),
+  (LEAD(Chrome) OVER(ORDER BY Order_Funnel) * 100 / Chrome) As Chrome_Perc,
+  Safari,
+  LEAD(Safari) OVER(ORDER BY Order_Funnel),
+  (LEAD(Safari) OVER(ORDER BY Order_Funnel) * 100 / Safari) As Safari_Perc,
+  Edge,
+  LEAD(Edge) OVER(ORDER BY Order_Funnel),
+  (LEAD(Edge) OVER(ORDER BY Order_Funnel) * 100 / Edge) As Edge_Perc,
+  Firefox,
+  LEAD(Firefox) OVER(ORDER BY Order_Funnel),
+  (LEAD(Firefox) OVER(ORDER BY Order_Funnel) * 100 / Firefox) As Firefox_Perc,
+  Other_Browsers,
+  LEAD(Other_Browsers) OVER(ORDER BY Order_Funnel),
+  (LEAD(Other_Browsers) OVER(ORDER BY Order_Funnel) * 100 / Other_Browsers) As Other_Browsers_Perc,
+  Android_Webview,
+  LEAD(Android_Webview) OVER(ORDER BY Order_Funnel),
+  (LEAD(Android_Webview) OVER(ORDER BY Order_Funnel) * 100 / Android_Webview) As Android_Webview_Perc
+FROM Browser_Used
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Chrome AS Chrome_Total,
+  LAG(Chrome_Perc) OVER(ORDER BY Order_Funnel) AS Chrome_Funnel,  
+  Safari AS Safari_Total,
+  LAG(Safari_Perc) OVER(ORDER BY Order_Funnel) AS Safari_Funnel,
+  Edge AS Edge_Total,
+  LAG(Edge_Perc) OVER(ORDER BY Order_Funnel) AS Edge_Funnel,
+  Firefox AS Firefox_Total,
+  LAG(Firefox_Perc) OVER(ORDER BY Order_Funnel) AS Firefox_Funnel,
+  Other_Browsers AS Other_Browsers_Total,
+  LAG(Other_Browsers_Perc) OVER(ORDER BY Order_Funnel) AS Other_Browsers_Funnel,
+  Android_Webview AS Android_Webview_Total,
+  LAG(Android_Webview_Perc) OVER(ORDER BY Order_Funnel) AS Android_Webview_Funnel
+FROM Browser_Percentage
+ORDER BY Order_Funnel
+;
+-- Price of Order --
+SELECT
+  DISTINCT user_pseudo_id,
+  AVG((SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value')) AS Total_Order
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE ((SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value')) IS NOT NULL
+GROUP BY 1
+ORDER BY 2 
+LIMIT 10
+;
+
+WITH Prices_ID AS (
+SELECT
+  DISTINCT user_pseudo_id,
+CASE 
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') < 40 THEN 'Low'
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') BETWEEN 40 AND 80 THEN 'Medium'
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') > 80 THEN 'High'
+  ELSE NULL
+END AS Order_Cost
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('purchase')
+GROUP BY 1  , 2
+)
+
+SELECT  
+ DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'Low' THEN bq.user_pseudo_id
+END) AS Low_Cost,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'Medium' THEN bq.user_pseudo_id
+END) AS Medium_Cost,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'High' THEN bq.user_pseudo_id
+END) AS High_Cost
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` BQ
+LEFT JOIN Prices_ID PID 
+  ON PID.user_pseudo_id = BQ.user_pseudo_id
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+    AND Order_Cost IS NOT NULL 
+GROUP BY event_name
+ORDER BY Order_Funnel
+
+;
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+GROUP BY event_name
+ORDER BY Order_Funnel
+
+;
+
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') < 40 THEN user_pseudo_id
+END) AS Low_Order_Cost,
+COUNT(DISTINCT CASE 
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') BETWEEN 40 AND 80 THEN user_pseudo_id
+END) AS Average_Order_Cost,
+COUNT(DISTINCT CASE 
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') > 80 THEN user_pseudo_id
+END) As High_Order_Cost
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+GROUP BY event_name
+ORDER BY Order_Funnel
+
+;
+
+WITH Purchase_Values AS (
+  SELECT
+    user_pseudo_id,
+    CASE 
+      WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'value') < 40 THEN 'Low'
+      WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'value') BETWEEN 40 AND 80 THEN 'Medium'
+      WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'value') > 80 THEN 'High'
+    END AS Price_Band
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE event_name = 'purchase'
+    AND (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'value') IS NOT NULL
+),
+
+Funnel_Events AS (
+  SELECT
+    user_pseudo_id,
+    event_name,
+    CASE
+      WHEN event_name = 'begin_checkout' THEN 1
+      WHEN event_name = 'add_shipping_info' THEN 2
+      WHEN event_name = 'add_payment_info' THEN 3
+      WHEN event_name = 'purchase' THEN 4
+    END AS Order_Funnel
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE event_name IN ('begin_checkout','add_shipping_info','add_payment_info','purchase')
+)
+
+SELECT
+  FE.event_name AS Events,
+  FE.Order_Funnel,
+  COUNT(DISTINCT CASE WHEN PV.Price_Band = 'Low' THEN FE.user_pseudo_id END) AS Low,
+  COUNT(DISTINCT CASE WHEN PV.Price_Band = 'Medium' THEN FE.user_pseudo_id END) AS Medium,
+  COUNT(DISTINCT CASE WHEN PV.Price_Band = 'High' THEN FE.user_pseudo_id END) AS High
+FROM Funnel_Events FE
+INNER JOIN Purchase_Values PV
+  ON FE.user_pseudo_id = PV.user_pseudo_id
+GROUP BY FE.event_name, FE.Order_Funnel
+ORDER BY FE.Order_Funnel
+;
+
+-- Coupons --
+
+SELECT
+  
+CASE
+  WHEN COUNT((SELECT value.string_value FROM UNNEST(event_params) WHERE `key` ='coupon')) THEN user_pseudo_id
+END AS Couponers
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+
+
+
+;
+WITH Prices_ID AS (
+SELECT
+  DISTINCT user_pseudo_id,
+CASE 
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') < 40 THEN 'Low'
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') BETWEEN 40 AND 80 THEN 'Medium'
+  WHEN (SELECT value.int_value FROM UNNEST(event_params) WHERE `key` ='value') > 80 THEN 'High'
+  ELSE NULL
+END AS Order_Cost
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('purchase')
+GROUP BY 1  , 2
+)
+
+SELECT  
+ DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'Low' THEN bq.user_pseudo_id
+END) AS Low_Cost,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'Medium' THEN bq.user_pseudo_id
+END) AS Medium_Cost,
+COUNT(DISTINCT CASE 
+  WHEN Order_Cost = 'High' THEN bq.user_pseudo_id
+END) AS High_Cost
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` BQ
+LEFT JOIN Prices_ID PID 
+  ON PID.user_pseudo_id = BQ.user_pseudo_id
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+    AND Order_Cost IS NOT NULL 
+GROUP BY event_name
+ORDER BY Order_Funnel
+
+;
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'begin_checkout' THEN 1
+  WHEN event_name = 'add_shipping_info' THEN 2
+  WHEN event_name = 'add_payment_info' THEN 3
+  WHEN event_name = 'purchase' THEN 4
+END AS Order_Funnel,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ("begin_checkout", "add_shipping_info", "add_payment_info", "purchase" )
+GROUP BY event_name
+ORDER BY Order_Funnel
+
+
+
+
+-- Finished Tables --
+
+-- Finished Customer Funnel --
+
+WITH
+Customer_Funnel AS (
+SELECT
+  event_name as events,
+  COUNT(DISTINCT user_pseudo_id) AS Customers,
+CASE
+  WHEN event_name = 'session_start' THEN 1
+  WHEN event_name ='view_promotion' THEN 2
+  WHEN event_name ='select_promotion' THEN 3 
+  WHEN event_name = 'select_item' THEN 4
+  WHEN event_name = 'add_to_cart' THEN 5
+  WHEN event_name ='begin_checkout' THEN 6
+  WHEN event_name ='add_shipping_info' THEN 7
+  WHEN event_name ='add_payment_info' THEN 8
+  WHEN event_name ='purchase' THEN 9
+END AS Order_Funnel
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'select_item','add_to_cart','begin_checkout', 'add_shipping_info','add_payment_info', 'purchase', 'view_promotion', 'select_promotion' )
+GROUP BY event_name
+ORDER BY Order_Funnel
+),
+
+Customer_Perc AS 
+(
+SELECT
+  Order_Funnel,
+  Events,
+  Customers,
+  LEAD(Customers) OVER(ORDER BY Order_Funnel),
+  (LEAD(Customers) OVER(ORDER BY Order_Funnel) * 100 / Customers) AS Customer_Percentage
+FROM Customer_Funnel
+ORDER BY Order_Funnel
+)
+
+SELECT
+  events,
+  Customers,
+  LAG(Customer_Percentage) OVER(ORDER BY Order_Funnel)
+FROM Customer_Perc
+ORDER BY order_funnel
+
+;
+-- Finished Countries Funnel --
+
+WITH Countries_Filtered AS (
+SELECT
+  event_name as events,
+CASE
+  WHEN event_name = 'session_start' THEN 1
+  WHEN event_name ='view_promotion' THEN 2
+  WHEN event_name ='select_promotion' THEN 3 
+  WHEN event_name = 'select_item' THEN 4
+  WHEN event_name = 'add_to_cart' THEN 5
+  WHEN event_name ='begin_checkout' THEN 6
+  WHEN event_name ='add_shipping_info' THEN 7
+  WHEN event_name ='add_payment_info' THEN 8
+  WHEN event_name ='purchase' THEN 9
+END AS Order_Funnel,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "United States" THEN user_pseudo_id
+END) AS USA,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "India" THEN user_pseudo_id
+END) AS India,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "Canada" THEN user_pseudo_id
+END) AS Canada,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "United Kingdom" THEN user_pseudo_id
+END) AS UK,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "France" THEN user_pseudo_id
+END) AS France,
+COUNT(DISTINCT  CASE
+  WHEN geo.country = "Spain" THEN user_pseudo_id
+END) AS Spain,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "China" THEN user_pseudo_id
+END) AS China,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "Taiwan" THEN user_pseudo_id
+END) AS Taiwan,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "Germany" THEN user_pseudo_id
+END) AS Germany,
+COUNT(DISTINCT CASE
+  WHEN geo.country = "Italy" THEN user_pseudo_id
+END) AS Italy,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'select_item','add_to_cart','begin_checkout', 'add_shipping_info','add_payment_info', 'purchase', 'view_promotion', 'select_promotion' )
+GROUP BY event_name, order_funnel
+ORDER BY Order_Funnel
+),
+
+Countries_Percantage AS (
+SELECT
+  Events,
+  Order_funnel,
+  USA,
+  LEAD(USA) OVER(ORDER BY Order_Funnel),
+  (LEAD(USA) OVER(ORDER BY Order_Funnel) * 100 / USA) As USA_Perc,
+  India,
+  LEAD(India) OVER(ORDER BY Order_Funnel),
+  (LEAD(India) OVER(ORDER BY Order_Funnel) * 100 / India) As India_Perc,
+  Canada,
+  LEAD(Canada) OVER(ORDER BY Order_Funnel),
+  (LEAD(Canada) OVER(ORDER BY Order_Funnel) * 100 / Canada) As Canada_Perc,
+  UK,
+  LEAD(UK) OVER(ORDER BY Order_Funnel),
+  (LEAD(UK) OVER(ORDER BY Order_Funnel) * 100 / UK) As UK_Perc,
+  France,
+  LEAD(France) OVER(ORDER BY Order_Funnel),
+  (LEAD(France) OVER(ORDER BY Order_Funnel) * 100 / France) As France_Perc,
+  Spain,
+  LEAD(Spain) OVER(ORDER BY Order_Funnel),
+  (LEAD(Spain) OVER(ORDER BY Order_Funnel) * 100 / Spain) As Spain_Perc,
+  China,
+  LEAD(China) OVER(ORDER BY Order_Funnel),
+  (LEAD(China) OVER(ORDER BY Order_Funnel) * 100 / China) As China_Perc,
+  Taiwan,
+  LEAD(Taiwan) OVER(ORDER BY Order_Funnel),
+  (LEAD(Taiwan) OVER(ORDER BY Order_Funnel) * 100 / Taiwan) As Taiwan_Perc,
+  Germany,
+  LEAD(Germany) OVER(ORDER BY Order_Funnel),
+  (LEAD(Germany) OVER(ORDER BY Order_Funnel) * 100 / Germany) As Germany_Perc,
+  Italy,
+  LEAD(Italy) OVER(ORDER BY Order_Funnel),
+  (LEAD(Italy) OVER(ORDER BY Order_Funnel) * 100 / Italy) As Italy_Perc
+FROM Countries_Filtered
+Order By Order_funnel
+)
+
+SELECT
+  Events,
+  LAG (USA_Perc) OVER(ORDER BY Order_Funnel) AS USA,
+  LAG (India_Perc) OVER(ORDER BY Order_Funnel) AS India,
+  LAG (Canada_Perc) OVER(ORDER BY Order_Funnel) AS Canada,
+  LAG (UK_Perc) OVER(ORDER BY Order_Funnel) AS UK,
+  LAG (France_Perc) OVER(ORDER BY Order_Funnel) AS France,
+  LAG (Spain_Perc) OVER(ORDER BY Order_Funnel) AS Spain,
+  LAG (China_Perc) OVER(ORDER BY Order_Funnel) AS China,
+  LAG (Taiwan_Perc) OVER(ORDER BY Order_Funnel) AS Taiwan,
+  LAG (Germany_Perc) OVER(ORDER BY Order_Funnel) AS Germany,
+  LAG (Italy_Perc) OVER(ORDER BY Order_Funnel) AS Italy
+FROM  Countries_Percantage
+ORDER BY Order_Funnel
+;
+
+-- Finished Devices Funnel --
+
+WITH Device_Used AS (
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'session_start' THEN 1
+  WHEN event_name ='view_promotion' THEN 2
+  WHEN event_name ='select_promotion' THEN 3 
+  WHEN event_name = 'select_item' THEN 4
+  WHEN event_name = 'add_to_cart' THEN 5
+  WHEN event_name ='begin_checkout' THEN 6
+  WHEN event_name ='add_shipping_info' THEN 7
+  WHEN event_name ='add_payment_info' THEN 8
+  WHEN event_name ='purchase' THEN 9
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN device.category = "mobile" THEN user_pseudo_id
+END) AS Mobile,
+COUNT(DISTINCT CASE
+  WHEN device.category = "desktop" THEN user_pseudo_id
+END) AS Desktop,
+COUNT(DISTINCT CASE
+  WHEN device.category = "tablet" THEN user_pseudo_id
+END) AS Tablet
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'select_item','add_to_cart','begin_checkout', 'add_shipping_info','add_payment_info', 'purchase', 'view_promotion', 'select_promotion' )
+GROUP BY event_name
+ORDER BY Order_Funnel
+),
+
+Devices_Percentage AS (
+SELECT 
+  Order_Funnel,
+  Events,
+  Mobile,
+  LEAD(Mobile) OVER(ORDER BY Order_Funnel),
+  (LEAD(Mobile) OVER(ORDER BY Order_Funnel) * 100 / Mobile) As Mobile_Perc,
+  Desktop,
+  LEAD(Desktop) OVER(ORDER BY Order_Funnel),
+  (LEAD(Desktop) OVER(ORDER BY Order_Funnel) * 100 / Desktop) AS Desktop_Perc,
+  Tablet,
+  LEAD(Tablet) OVER(ORDER BY Order_Funnel),
+  (LEAD(Tablet) OVER(ORDER BY Order_Funnel) * 100 / Tablet) AS Tablet_Perc
+FROM Device_Used
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Mobile AS Mobile_Total,
+  LAG(Mobile_Perc) OVER(ORDER BY Order_Funnel) AS Mobile_Funnel,
+  Desktop AS Desktop_Total,
+  LAG(Desktop_Perc) OVER(ORDER BY Order_Funnel) AS Desktop_Funnel
+FROM Devices_Percentage
+ORDER BY Order_Funnel
+;
+
+-- Finished Browser Funnel --
+
+WITH Browser_Used AS (
+SELECT
+  DISTINCT event_name as Events,
+CASE
+  WHEN event_name = 'session_start' THEN 1
+  WHEN event_name ='view_promotion' THEN 2
+  WHEN event_name ='select_promotion' THEN 3 
+  WHEN event_name = 'select_item' THEN 4
+  WHEN event_name = 'add_to_cart' THEN 5
+  WHEN event_name ='begin_checkout' THEN 6
+  WHEN event_name ='add_shipping_info' THEN 7
+  WHEN event_name ='add_payment_info' THEN 8
+  WHEN event_name ='purchase' THEN 9
+END AS Order_Funnel,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Chrome" THEN user_pseudo_id
+END) AS Chrome,
+COUNT(DISTINCT CASE
+  WHEN device.web_info.browser = "Safari" THEN user_pseudo_id
+END) AS Safari,
+COUNT(DISTINCT CASE
+  WHEN device.web_info.browser = "Edge" THEN user_pseudo_id
+END) AS Edge,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Firefox" THEN user_pseudo_id
+END) AS Firefox,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "<Other>" THEN user_pseudo_id
+END) AS Other_Browsers,
+COUNT(DISTINCT CASE 
+  WHEN device.web_info.browser = "Android Webview" THEN user_pseudo_id
+END) AS Android_Webview,
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name IN ('session_start', 'select_item','add_to_cart','begin_checkout', 'add_shipping_info','add_payment_info', 'purchase', 'view_promotion', 'select_promotion' )
+GROUP BY event_name
+ORDER BY Order_Funnel
+),
+
+Browser_Percentage AS (
+SELECT 
+  Order_Funnel,
+  Events,
+  Chrome,
+  LEAD(Chrome) OVER(ORDER BY Order_Funnel),
+  (LEAD(Chrome) OVER(ORDER BY Order_Funnel) * 100 / Chrome) As Chrome_Perc,
+  Safari,
+  LEAD(Safari) OVER(ORDER BY Order_Funnel),
+  (LEAD(Safari) OVER(ORDER BY Order_Funnel) * 100 / Safari) As Safari_Perc,
+  Edge,
+  LEAD(Edge) OVER(ORDER BY Order_Funnel),
+  (LEAD(Edge) OVER(ORDER BY Order_Funnel) * 100 / Edge) As Edge_Perc,
+  Firefox,
+  LEAD(Firefox) OVER(ORDER BY Order_Funnel),
+  (LEAD(Firefox) OVER(ORDER BY Order_Funnel) * 100 / Firefox) As Firefox_Perc,
+  Other_Browsers,
+  LEAD(Other_Browsers) OVER(ORDER BY Order_Funnel),
+  (LEAD(Other_Browsers) OVER(ORDER BY Order_Funnel) * 100 / Other_Browsers) As Other_Browsers_Perc,
+  Android_Webview,
+  LEAD(Android_Webview) OVER(ORDER BY Order_Funnel),
+  (LEAD(Android_Webview) OVER(ORDER BY Order_Funnel) * 100 / Android_Webview) As Android_Webview_Perc
+FROM Browser_Used
+ORDER BY Order_Funnel
+)
+
+SELECT
+  Events,
+  Chrome AS Chrome_Total,
+  LAG(Chrome_Perc) OVER(ORDER BY Order_Funnel) AS Chrome_Funnel,  
+  Safari AS Safari_Total,
+  LAG(Safari_Perc) OVER(ORDER BY Order_Funnel) AS Safari_Funnel,
+  Edge AS Edge_Total,
+  LAG(Edge_Perc) OVER(ORDER BY Order_Funnel) AS Edge_Funnel,
+  Firefox AS Firefox_Total,
+  LAG(Firefox_Perc) OVER(ORDER BY Order_Funnel) AS Firefox_Funnel,
+  Other_Browsers AS Other_Browsers_Total,
+  LAG(Other_Browsers_Perc) OVER(ORDER BY Order_Funnel) AS Other_Browsers_Funnel,
+  Android_Webview AS Android_Webview_Total,
+  LAG(Android_Webview_Perc) OVER(ORDER BY Order_Funnel) AS Android_Webview_Funnel
+FROM Browser_Percentage
+ORDER BY Order_Funnel
+
+;
+-- Coupons --
+
+SELECT
+
+COUNT( DISTINCT CASE
+  WHEN (SELECT value.string_value FROM UNNEST(event_params) WHERE `key` ='coupon') IS NOT NULL THEN user_pseudo_id
+END) AS Coupon_Paid,
+COUNT(DISTINCT CASE
+  WHEN (SELECT value.string_value FROM UNNEST(event_params) WHERE `key` ='coupon') IS NULL THEN user_pseudo_id
+END) AS Non_Coupon
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE event_name = 'purchase'
+
+
+
+
+
